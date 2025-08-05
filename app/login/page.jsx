@@ -1,84 +1,139 @@
 "use client";
+
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from 'next/link';
+import { CheckSquare, User, KeyRound } from 'lucide-react';
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  async function handleLogin(e) {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    const res = await signIn("credentials", {
-      redirect: false,
-      username,
-      password,
-    });
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        // Using username and password as requested
+        username,
+        password,
+      });
 
-    if (res.ok && !res.error) {
-      router.push("/");
-    } else {
-      setError("Invalid username or password");
+      if (res.ok && !res.error) {
+        router.replace("/"); // Use replace to avoid user going back to login page
+      } else {
+        setError("Invalid username or password. Please try again.");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("An unexpected error occurred.");
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 px-4">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white/10 backdrop-blur-lg border border-white/20 shadow-lg rounded-2xl px-8 py-10 w-full max-w-md space-y-6 text-white"
-      >
-        <h1 className="text-3xl font-bold text-center mb-2">Login</h1>
-
-        {error && (
-          <p className="bg-red-500/20 text-red-400 text-sm px-4 py-2 rounded-md border border-red-400/30">
-            {error}
-          </p>
-        )}
-
-        <div>
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            required
-            className="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 focus:ring-2 focus:ring-indigo-400 focus:outline-none text-white placeholder-gray-300"
-          />
+    <main className="min-h-screen w-full flex flex-col items-center justify-center bg-stone-50 p-4">
+      <div className="w-full max-w-md">
+        {/* Header with App Name and Description */}
+        <div className="text-center mb-8">
+          <div className="flex justify-center items-center gap-2.5 mb-3">
+            <div className="p-2 bg-gray-900 rounded-lg">
+              <CheckSquare className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-3xl font-bold text-gray-900 tracking-tight">Taskly</span>
+          </div>
+          <p className="text-gray-500">Welcome back! Please log in to your account.</p>
         </div>
 
-        <div>
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-            className="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 focus:ring-2 focus:ring-indigo-400 focus:outline-none text-white placeholder-gray-300"
-          />
+        {/* Login Form */}
+        <div className="bg-white p-8 border border-gray-200 rounded-xl shadow-md">
+          <form onSubmit={handleLogin} className="space-y-5">
+            {/* Username Field */}
+            <div>
+              <label
+                htmlFor="username"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Username
+              </label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Your username"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-800 focus:border-gray-800 outline-none transition"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Password
+              </label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <KeyRound className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-800 focus:border-gray-800 outline-none transition"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="p-3 text-center text-sm text-red-700 bg-red-50 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex justify-center py-3 px-4 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? 'Logging in...' : 'Log In'}
+              </button>
+            </div>
+          </form>
         </div>
 
-        <button
-          type="submit"
-          className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 transition-colors rounded-lg font-semibold text-white shadow-md"
-        >
-          Login
-        </button>
-
-        <p className="text-sm text-center text-gray-300">
-          Don&apos;t have an account?{" "}
-          <a
-            href="/signup"
-            className="text-indigo-400 hover:underline font-medium"
-          >
-            Sign Up
-          </a>
+        {/* Link to Sign Up */}
+        <p className="mt-6 text-center text-sm text-gray-600">
+          Don&apos;t have an account?{' '}
+          <Link href="/signup" className="font-medium text-gray-900 hover:underline">
+            Sign up
+          </Link>
         </p>
-      </form>
-    </div>
+      </div>
+    </main>
   );
 }

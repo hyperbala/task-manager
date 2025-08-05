@@ -5,100 +5,68 @@ import { useRouter } from 'next/navigation';
 import TaskModal from '../components/AddTaskModal.jsx';
 import DeleteConfirmationModal from '@/components/deleteModal.jsx';
 import Navbar from '../components/Navbar.jsx';
-import { Plus, Filter, Search, Calendar, User, Flag, CheckCircle, Clock, AlertCircle, Eye, Edit, Trash2 } from 'lucide-react';
+import {
+  Plus, Filter, Search, Calendar, User, Flag,
+  CheckCircle, Clock, AlertCircle, Eye, Edit, Trash2
+} from 'lucide-react';
 
-const statusOptions = [
-  { value: '', label: 'All Tasks', color: 'text-gray-600' },
-  { value: 'Pending', label: 'Pending', color: 'text-amber-600' },
-  { value: 'Done', label: 'Completed', color: 'text-emerald-600' },
-];
-
+// Softer, more minimalist color palette for categories
 const categoryColors = {
-  'Work': 'bg-blue-100 text-blue-800',
-  'Personal': 'bg-green-100 text-green-800',
-  'Urgent': 'bg-red-100 text-red-800',
-  'Meeting': 'bg-purple-100 text-purple-800',
-  'Default': 'bg-gray-100 text-gray-800'
+  Work: 'bg-blue-50 text-blue-700',
+  Personal: 'bg-green-50 text-green-700',
+  Urgent: 'bg-red-50 text-red-700',
+  Meeting: 'bg-purple-50 text-purple-700',
+  Default: 'bg-gray-100 text-gray-600'
 };
 
+const statusOptions = [
+  { value: '', label: 'All Tasks' },
+  { value: 'Pending', label: 'Pending' },
+  { value: 'Done', label: 'Completed' }
+];
+
 export default function Home() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
   const [tasks, setTasks] = useState([]);
-
-const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-const [taskToDelete, setTaskToDelete] = useState(null);
-const [showAddModal, setShowAddModal] = useState(false);
-const [showEditModal, setShowEditModal] = useState(false); // to toggle edit modal
-const [selectedTask, setSelectedTask] = useState(null);     // to store task being edited
-
   const [statusFilter, setStatusFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-const tasksPerPage = 10;
-
-// Reset to page 1 on filter or search change
-useEffect(() => {
-  setCurrentPage(1);
-}, [statusFilter, searchTerm]);
-
-// Pagination logic
-
+  const tasksPerPage = 10;
 
   const { data: session, status } = useSession();
   const router = useRouter();
-  
 
-  function openModal() {
-    setShowAddModal(true); 
-  }
-  
-  function closeModal() {
-    setShowAddModal(false);
-  }
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'Done': return <CheckCircle className="h-5 w-5 text-emerald-500" />;
-      case 'Pending': return <Clock className="h-5 w-5 text-amber-500" />;
-      default: return <AlertCircle className="h-5 w-5 text-gray-500" />;
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.replace('/login');
     }
-  };
+  }, [status, router]);
 
-  const getCategoryColor = (category) => {
-    return categoryColors[category] || categoryColors['Default'];
-  };
-
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchTerm]);
 
   const openDeleteModal = (task) => {
-  setTaskToDelete(task);
-  setIsDeleteModalOpen(true);
-};
+    setTaskToDelete(task);
+    setIsDeleteModalOpen(true);
+  };
 
-const closeDeleteModal = () => {
-  setIsDeleteModalOpen(false);
-  setTaskToDelete(null);
-};
+  const closeDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setTaskToDelete(null);
+  };
 
-async function handleDelete() {
-  try {
-    const res = await fetch(`/api/tasks/${taskToDelete._id}`, { method: "DELETE" });
-    if (res.ok) {
-      fetchTasks();
-      closeDeleteModal();
-    } else {
-      console.error("Failed to delete task");
-    }
-  } catch (error) {
-    console.error("Error deleting task:", error);
-  }
-}
-
-
-  async function fetchTasks(selectedStatus = statusFilter) {
+  async function fetchTasks() {
     try {
+      // NOTE: Ensure your API at '/api/tasks' populates the 'creator' field.
+      // Example: .populate('creator', 'name') in Mongoose.
       let url = '/api/tasks';
       const params = [];
-      if (selectedStatus) params.push(`status=${selectedStatus}`);
+      if (statusFilter) params.push(`status=${statusFilter}`);
       if (params.length) url += `?${params.join('&')}`;
 
       const res = await fetch(url);
@@ -111,316 +79,238 @@ async function handleDelete() {
     }
   }
 
-
-  const handleUpdateTask = async (updatedTask) => {
-  try {
-    const res = await fetch(`/api/tasks/${updatedTask._id}`, {
-      method: "PATCH", 
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(updatedTask),
-    });
-
-
-    if (!res.ok) throw new Error("Update failed");
-
-    // Refresh or update task list in UI
-    setTasks(prev => prev.map(t => t._id === updatedTask._id ? updatedTask : t));
-    setShowEditModal(false);
-  } catch (err) {
-    console.error("Error updating task:", err);
+  async function handleDelete() {
+    try {
+      const res = await fetch(`/api/tasks/${taskToDelete._id}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchTasks();
+        closeDeleteModal();
+      }
+    } catch (err) {
+      console.error("Error deleting task:", err);
+    }
   }
-};
 
-  
   async function addTask(task) {
     try {
       const res = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(task),
+        body: JSON.stringify(task)
       });
       if (res.ok) {
-        closeModal();
+        setShowAddModal(false);
         fetchTasks();
-      } else {
-        console.error('Failed to add task');
       }
     } catch (error) {
       console.error('Error adding task:', error);
     }
   }
 
-  useEffect(() => {
-  async function loadTasks() {
-    await fetchTasks();
-  }
-  loadTasks();
-}, [statusFilter]);
+  const handleUpdateTask = async (updatedTask) => {
+    try {
+      const res = await fetch(`/api/tasks/${updatedTask._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedTask)
+      });
+      if (res.ok) {
+        setTasks(prev => prev.map(t => t._id === updatedTask._id ? updatedTask : t));
+        setShowEditModal(false);
+      }
+    } catch (err)
+ {
+      console.error("Error updating task:", err);
+    }
+  };
 
+  useEffect(() => { fetchTasks(); }, [statusFilter]);
 
-  // Filter tasks based on search term and status
   const filteredTasks = tasks.filter(task => {
-    const matchesStatus = !statusFilter || task.status === statusFilter;
-    const matchesSearch = !searchTerm || 
-      task.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchStatus = !statusFilter || task.status === statusFilter;
+    const matchSearch = !searchTerm || task.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.category?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
+    return matchStatus && matchSearch;
   });
 
-  const indexOfLastTask = currentPage * tasksPerPage;
-  const indexOfFirstTask = indexOfLastTask - tasksPerPage;
-  const paginatedTasks = filteredTasks.slice(indexOfFirstTask, indexOfLastTask);
-  
-const totalPages = Math.ceil(filteredTasks.length / tasksPerPage);
+  const paginatedTasks = filteredTasks.slice(
+    (currentPage - 1) * tasksPerPage,
+    currentPage * tasksPerPage
+  );
 
+  const totalPages = Math.ceil(filteredTasks.length / tasksPerPage);
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/login');
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'Done': return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'Pending': return <Clock className="h-5 w-5 text-amber-500" />;
+      default: return <AlertCircle className="h-5 w-5 text-gray-400" />;
     }
-  }, [status, router]);
+  };
 
-  // While checking session, show nothing or a loader
-  if (status === 'loading') {
-    return <div>Loading...</div>;
-  }
+  const getCategoryColor = (category) => categoryColors[category] || categoryColors.Default;
 
-  
+  if (status === 'loading') return <div className="p-8 text-center text-gray-500">Loading application...</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-stone-50 text-gray-800">
       <Navbar />
-      <main className="max-w-7xl mx-auto p-6">
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-              <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
-                  Task Management Dashboard
-                </h1>
-                <p className="text-gray-600">Organize your work efficiently and stay productive</p>
-              </div>
-              
-              <button
-                onClick={openModal}
-                className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
-              >
-                <Plus className="h-5 w-5" />
-                <span className="font-medium">Add New Task</span>
-              </button>
-            </div>
+      <main className="max-w-5xl mx-auto px-4 py-8 md:py-12 space-y-8">
+
+        {/* Header */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Task Dashboard</h1>
+            <p className="text-gray-500">A clean and simple overview of your tasks.</p>
           </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center cursor-pointer gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" /> New Task
+          </button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-6 text-white shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-emerald-100 text-sm">Completed</p>
-                <p className="text-3xl font-bold">{tasks.filter(t => t.status === 'Done').length}</p>
-              </div>
-              <CheckCircle className="h-12 w-12 text-emerald-200" />
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-amber-100 text-sm">Pending</p>
-                <p className="text-3xl font-bold">{tasks.filter(t => t.status === 'Pending').length}</p>
-              </div>
-              <Clock className="h-12 w-12 text-amber-200" />
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-r from-red-500 to-pink-600 rounded-2xl p-6 text-white shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-red-100 text-sm">Important</p>
-                <p className="text-3xl font-bold">{tasks.filter(t => t.isImportant).length}</p>
-              </div>
-              <Flag className="h-12 w-12 text-red-200" />
-            </div>
-          </div>
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <StatCard label="Completed" value={tasks.filter(t => t.status === 'Done').length} icon={<CheckCircle />} iconBgClass="bg-green-100" textClass="text-green-600" />
+          <StatCard label="Pending" value={tasks.filter(t => t.status === 'Pending').length} icon={<Clock />} iconBgClass="bg-amber-100" textClass="text-amber-600" />
+          <StatCard label="Important" value={tasks.filter(t => t.isImportant).length} icon={<Flag />} iconBgClass="bg-red-100" textClass="text-red-600" />
         </div>
-
-        {/* Filters Section */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6 mb-8">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search tasks..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-              />
-            </div>
-            
-            {/* Status Filter */}
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <select
-                className="pl-10 pr-8 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none bg-white min-w-[200px] transition-all"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+        
+        {/* Filter + Search */}
+        <div className="flex flex-col sm:flex-row gap-3 items-center">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <input
+              type="text"
+              placeholder="Search tasks by title, description..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-800 focus:border-gray-800 outline-none transition"
+            />
           </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full sm:w-auto px-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-800 focus:border-gray-800 outline-none transition"
+          >
+            {statusOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
 
         {/* Tasks Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {paginatedTasks.length === 0 ? (
-            <div className="col-span-full">
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-12 text-center">
-                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="h-12 w-12 text-gray-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">No tasks found</h3>
-                <p className="text-gray-500">Try adjusting your search or filter criteria</p>
-              </div>
+            <div className="md:col-span-2 py-16 text-center text-gray-500 border-2 border-dashed rounded-lg bg-white">
+              <h3 className="text-lg font-medium">No tasks found</h3>
+              <p>Try a different filter or create a new task to get started.</p>
             </div>
           ) : (
-            paginatedTasks.map((task) => (
+            paginatedTasks.map(task => (
               <div
                 key={task._id}
-                className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 group"
+                className="group bg-white p-5 rounded-lg border border-gray-200 flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:scale-[1.03]"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center space-x-2">
-                    {getStatusIcon(task.status)}
-                    <span className={`text-sm font-medium ${
-                      task.status === 'Done' ? 'text-emerald-600' :
-                      task.status === 'Pending' ? 'text-amber-600' : 'text-gray-600'
-                    }`}>
+                {/* Main content */}
+                <div>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 pr-2">
+                      <h3 className="font-medium text-gray-800">{task.title}</h3>
+                      {task.creator && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Created by <span className="font-medium text-gray-700">{task.creator}</span>
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-600 mt-2 line-clamp-2">{task.description}</p>
+                    </div>
+
+                     <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-start">
+                      {task.isImportant && (
+                        <span className="text-xs px-2 py-0.5 bg-red-50 text-red-700 rounded-full flex items-center gap-1 font-medium whitespace-nowrap">
+                          <Flag className="h-3 w-3" /> Important
+                        </span>
+                      )}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <button onClick={() => { setSelectedTask(task); setShowEditModal(true); }} className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 cursor-pointer hover:text-gray-800">
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => openDeleteModal(task)} className="p-1.5 rounded-md cursor-pointer hover:bg-red-50 text-red-600">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                                        </div>
+
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Footer */}
+                <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5 text-sm text-gray-600">
+                      {getStatusIcon(task.status)}
                       {task.status}
                     </span>
-                  </div>
-                  {task.isImportant && (
-                    <div className="flex items-center space-x-1 bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs font-medium">
-                      <Flag className="h-3 w-3" />
-                      <span>Important</span>
-                    </div>
-                  )}
-                </div>
-
-                <h3 className="text-lg font-semibold text-gray-800 mb-2 group-hover:text-indigo-600 transition-colors">
-                  {task.title}
-                </h3>
-                
-                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                  {task.description}
-                </p>
-
-                <div className="flex items-center justify-between mb-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getCategoryColor(task.category)}`}>
-                    {task.category}
-                  </span>
-                  <div className="flex items-center space-x-1 text-xs text-gray-500">
-                    <Calendar className="h-3 w-3" />
-                    <span>
-                      {task.createdAt ? new Date(task.createdAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                      }) : 'N/A'}
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(task.category)}`}>
+                      {task.category}
                     </span>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  <div className="flex items-center space-x-2">
-                    <div className="h-6 w-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
-                      <User className="h-3 w-3 text-white" />
-                    </div>
-                    <span className="text-xs text-gray-500">{task.creator || 'Unknown'}</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1 text-gray-400 hover:text-indigo-600 transition-colors">
-                      <Eye className="h-4 w-4" />
-                                    </button>
-                                    
-                    <button
-                  onClick={() => {
-                        setSelectedTask(task);
-                        setShowEditModal(true);
-                      }}
-                      className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-
-                    <button
-                      onClick={() => openDeleteModal(task)}
-                      className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-
+                  <div className="flex items-center text-xs text-gray-500">
+                    {/* --- MODIFICATION: Creator removed from footer --- */}
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>{task.createdAt && new Date(task.createdAt).toLocaleDateString()}</span>
+                    </span>
                   </div>
                 </div>
               </div>
             ))
-
-            
           )}
-          {totalPages > 1 && (
-  <div className="flex justify-center mt-8 space-x-2">
-    {Array.from({ length: totalPages }, (_, i) => (
-      <button
-        key={i}
-        onClick={() => setCurrentPage(i + 1)}
-        className={`px-3 py-1 rounded text-sm border font-medium transition-all ${
-          currentPage === i + 1
-            ? "bg-indigo-600 text-white"
-            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
-        }`}
-      >
-        {i + 1}
-      </button>
-    ))}
-  </div>
-)}
-
         </div>
-        <TaskModal
-  isOpen={showAddModal}
-  onClose={() => setShowAddModal(false)}
-  onSubmit={addTask}
-  mode="add"
-/>
 
-              <DeleteConfirmationModal
-                isOpen={isDeleteModalOpen}
-                onClose={closeDeleteModal}
-                onConfirm={handleDelete}
-              />
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center gap-2 pt-4">
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentPage(i + 1)}
+                className={`px-3 py-1 rounded-md text-sm cursor-pointer font-medium transition-colors ${
+                  currentPage === i + 1 
+                  ? 'bg-gray-900 text-white' 
+                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+        )}
 
-              <TaskModal
-  isOpen={showEditModal}
-  onClose={() => setShowEditModal(false)}
-  onSubmit={handleUpdateTask}
-  mode="edit"
-  task={selectedTask}
-/>
-
-
+        {/* Modals */}
+        <TaskModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onSubmit={addTask} mode="add" />
+        <TaskModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} onSubmit={handleUpdateTask} task={selectedTask} mode="edit" />
+        <DeleteConfirmationModal isOpen={isDeleteModalOpen} onClose={closeDeleteModal} onConfirm={handleDelete} />
 
       </main>
+    </div>
+  );
+}
+
+// Colorful and minimalist stat card
+function StatCard({ label, value, icon, iconBgClass, textClass }) {
+  return (
+    <div className="bg-white p-5 rounded-lg border border-gray-200 flex items-center gap-4">
+      <div className={`p-3 rounded-lg ${iconBgClass} ${textClass}`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-sm text-gray-500">{label}</p>
+        <p className={`text-2xl font-bold ${textClass}`}>{value}</p>
+      </div>
     </div>
   );
 }
